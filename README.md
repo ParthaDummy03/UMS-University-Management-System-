@@ -1,68 +1,42 @@
-# Lotus University Management System — Frontend
+# Lotus University Administration System
 
-A responsive frontend-only University Management System built with HTML5, CSS3 and vanilla JavaScript. The Lotus University logo and existing visual direction are retained. No frontend framework, build step or package installation is required.
+University administration app with separate Admin, Teacher and Student workspaces. It uses the existing HTML/CSS/vanilla JavaScript frontend, a Python standard-library web server and SQLite persistence. There are no package installs or build step.
 
 ## Run locally
 
-1. Extract the project folder.
-2. Open `university-management-system` in VS Code.
-3. Install the **Live Server** extension if it is not already installed.
-4. Right-click `index.html` and choose **Open with Live Server**.
-5. The public entry page is the university login screen.
+1. Install Python 3.10 or newer.
+2. Open PowerShell in this project folder.
+3. Run `python server.py`.
+4. Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
+5. On first launch, create the initial Admin account. Use a strong password with at least 12 characters.
 
-The login form is intentionally not a fake login: it displays an integration-pending message because no authentication service exists yet. No credentials are accepted, transmitted or stored. Forgot Password is also an integration point only.
+The database is created at `data/lotus_ums.sqlite3` and is seeded with sample university records. It contains no preconfigured accounts or shared passwords. After signing in as Admin, open **Accounts** to create Teacher and Student logins. Link an account to an existing profile by using the same university ID, or let the account form create a profile. Add course registrations under **Enrollments**.
 
-## Implemented frontend
+## Workspaces
 
-- Professional Lotus University sign-in page: University Email / ID, Password, Login and Forgot Password.
-- Five role workspaces: Super Administrator, Administrator, Teacher / Faculty, Student and Department Head.
-- Role-specific sidebar navigation and page visibility.
-- Dashboard statistics, course summaries, notices and recent student records.
-- Student and teacher directories with search, add, edit and delete operations for administrative roles.
-- Department and course directories with administrative CRUD operations.
-- Weekly timetable with days, times, course codes/titles, rooms and instructors.
-- Attendance records, attendance marking and status changes for permitted preview roles.
-- Result/marks entry with basic grade-point calculation and student result views.
-- Notices and announcements; publishing for administrative roles.
-- Student complaint submission and complaint status listing.
-- Department summaries, basic reports and CSV export.
-- Responsive sidebar, forms, tables, timetable and dialogs.
-- Separate developer-only role preview utility.
+| Role | Main access |
+|---|---|
+| Admin | All modules: accounts, students, teachers, departments, courses, enrollments, attendance, results, schedule, notices, complaints and reports. Admin can create and maintain records. |
+| Teacher | Read the full student directory and academic records. Record or update attendance/results only for students enrolled in assigned courses. See assigned courses, schedules and reports. |
+| Student | Read only their own profile, enrolled courses, section schedule, attendance, results and complaints. Submit their own complaints and read student notices. |
 
-## Developer role preview (not authentication)
+The backend applies role and record checks to each API request. Student record IDs and teacher course assignments are resolved from the signed-in session.
 
-Open `developer-preview.html` through Live Server to inspect the five dashboards without a backend. This page is deliberately separate from the normal login UI. It opens the selected workspace using mock data and displays a developer preview banner. Do not deploy this utility publicly. It does not authenticate anyone and must never be treated as an authorization mechanism.
+## Features
 
-## Mock data and persistence
+- First-admin setup, university ID/email login, logout and server-managed sessions.
+- Passwords hashed with PBKDF2; sign-in attempts are rate-limited.
+- SQLite storage for users, profiles, departments, courses, enrollments, schedules, attendance, grades, notices and complaints.
+- Admin account creation, profile linking and password reset.
+- Searchable student and teacher directories, course and department management, enrollment management and schedule editing.
+- Attendance and grade entry with course enrollment checks and server-side grade calculation.
+- Audience-filtered notices, student-owned complaints, reports and CSV export.
+- Responsive layouts, input validation and explicit empty/error states.
 
-- `js/data.js` contains the in-memory mock dataset and repository adapter.
-- `js/api.js` is the service boundary intended for real API integration.
-- `js/app.js` handles role navigation, page rendering, forms and interactions.
-- `css/style.css` contains the preserved base styles plus the Lotus design completion layer.
-- `assets/lotus-university-logo.png` is the supplied university logo.
+## Configuration and deployment
 
-Create, edit, delete, attendance and grade changes are held in JavaScript memory only. Refreshing the page resets them. No database or localStorage persistence is implemented.
+The server binds to `127.0.0.1:8000` by default. Set `UMS_HOST` and `UMS_PORT` to change the listener; set `UMS_DB_PATH` to change the database path. Set `UMS_ALLOW_INITIAL_SETUP=0` after provisioning the first Admin. For HTTPS behind a trusted reverse proxy, set `UMS_COOKIE_SECURE=1`.
 
-## Backend integration status
+This built-in server is intended for local development. Before public deployment, put the app behind a production WSGI server and TLS reverse proxy, disable first-admin setup after provisioning, configure backups, and add an email-based password recovery flow. Never use the sample academic records as real student data.
 
-**Pending:** real authentication, server-issued sessions/tokens, server-side role authorization, password reset, persistent database storage, API endpoints and Firebase configuration (if selected). The login form intentionally cannot create a session until the backend contract is implemented. See [`BACKEND_HANDOFF.md`](BACKEND_HANDOFF.md).
-
-## Security notes
-
-Frontend role navigation is for user experience only. It is not secure access control. Every protected endpoint and record must be authorized by the backend on every request. Never trust a role, user ID or department supplied by browser code.
-
-## Suggested review checklist
-
-- Open `index.html` and verify the login layout at desktop and mobile widths.
-- Verify login does not claim success while the authentication API is unavailable.
-- Open `developer-preview.html`; test all five role dashboards and role-specific sidebar links.
-- Student: test My Courses, Attendance, Results, Schedule, Complaints and Notices.
-- Teacher: test course list, students, attendance marking, marks entry, schedule and reports.
-- Administrator: test add/edit/delete/search for students, teachers, departments and courses; publish notices; inspect attendance/results/reports.
-- Department Head: verify department-scoped records and academic reporting.
-- Super Administrator: verify all administrative modules are visible.
-- Test schedule rows for Sunday–Thursday, times, rooms and instructors.
-- Submit a complaint, add attendance, add a grade and publish a notice; refresh and confirm mock changes reset.
-- Check browser DevTools for JavaScript errors and verify responsive behavior.
-
-Static validation performed for this delivery: JavaScript syntax checks, HTML parsing, local asset existence and required module/navigation assertions. Interactive browser automation is not claimed as completed; run the checklist above in Live Server before release.
+See [`BACKEND_HANDOFF.md`](BACKEND_HANDOFF.md) for the API and permission model.
