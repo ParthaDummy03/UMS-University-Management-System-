@@ -47,6 +47,7 @@ let activeRole = null;
 let activeUser = null;
 let activePage = 'dashboard';
 let toastTimer = null;
+let pageAnimationTimer = null;
 let searchTerm = '';
 let dialogContext = null;
 
@@ -122,10 +123,30 @@ function visibleNotices() {
 
 function scopedSchedule() {
   const courseIds = new Set(scopedCourses().map(course => course.id));
-  const section = activeRole === 'student'
-    ? (activeUser?.section || workspaceData.students.find(student => student.id === activeUser?.id)?.section)
-    : null;
-  return workspaceData.schedule.filter(item => courseIds.has(item.code) && (!section || item.group === section));
+  // The API already limits each role's timetable, including student section rules.
+  return workspaceData.schedule.filter(item => courseIds.has(item.code));
+}
+
+function localDateInputValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function animatePageEntry() {
+  const body = $('#pageBody');
+  clearTimeout(pageAnimationTimer);
+  body.classList.remove('page-entering');
+  void body.offsetWidth;
+  body.classList.add('page-entering');
+  pageAnimationTimer = setTimeout(() => body.classList.remove('page-entering'), 600);
+}
+
+function setSidebarOpen(open) {
+  $('#sidebar').classList.toggle('sidebar-open', open);
+  $('#sidebarBackdrop').classList.toggle('is-visible', open);
+  $('#menuToggle').setAttribute('aria-expanded', String(open));
 }
 
 function studentsForCourse(courseId) {
@@ -133,6 +154,12 @@ function studentsForCourse(courseId) {
     .filter(enrollment => enrollment.courseId === courseId && enrollment.status === 'Active')
     .map(enrollment => enrollment.studentId));
   return workspaceData.students.filter(student => enrolledIds.has(student.id));
+}
+
+function studentOptionsForCourse(courseId, selectedId = '') {
+  const students = studentsForCourse(courseId);
+  if (!students.length) return '<option value="" selected disabled>No active students enrolled</option>';
+  return students.map(student => `<option value="${esc(student.id)}" ${student.id === selectedId ? 'selected' : ''}>${esc(student.name)} · ${esc(student.id)}</option>`).join('');
 }
 
 function applyWorkspaceData(data) {
@@ -200,8 +227,9 @@ function navigate(page) {
   $('#pageTitle').textContent = pageMeta[page][0];
   $('#pageSubtitle').textContent = pageMeta[page][1];
   $('#pageActions').replaceChildren();
-  $('#sidebar').classList.remove('sidebar-open');
+  setSidebarOpen(false);
   history.replaceState(null, '', `#${page}`);
+  animatePageEntry();
   renderPage();
 }
 
@@ -313,7 +341,7 @@ function directoryPage(key) {
     render = student => `<tr><td>${esc(student.name)}</td><td>${esc(student.id)}</td><td>${esc(student.email)}</td><td>${esc(student.department)}</td><td>${esc(student.year)}</td><td>${esc(student.semester)}</td><td>${esc(student.section)}</td><td>${esc(student.phone)}</td><td><span class="status status-${safeClass(student.status)}">${esc(student.status)}</span></td>${isAdmin() ? `<td>${actionButton('edit', 'Edit', student.id)}${student.status === 'Active' ? actionButton('delete', 'Deactivate', student.id) : ''}</td>` : ''}</tr>`;
   } else if (key === 'teachers') {
     headers = ['NAME', 'FACULTY ID', 'EMAIL', 'DEPARTMENT', 'DESIGNATION', 'STATUS', 'ACTIONS'];
-    render = teacher => `<tr><td>${esc(teacher.name)}</td><td>${esc(teacher.id)}</td><td>${esc(teacher.email)}</td><td>${esc(teacher.department)}</td><td>${esc(teacher.designation)}</td><td>${esc(teacher.status)}</td><td>${actionButton('edit', 'Edit', teacher.id)}${actionButton('delete', 'Delete', teacher.id)}</td></tr>`;
+    render = teacher => `<tr><td>${esc(teacher.name)}</td><td>${esc(teacher.id)}</td><td>${esc(teacher.email)}</td><td>${esc(teacher.department)}</td><td>${esc(teacher.designation)}</td><td>${esc(teacher.status)}</td><td>${actionButton('edit', 'Edit', teacher.id)}${teacher.status === 'Active' ? actionButton('delete', 'Deactivate', teacher.id) : ''}</td></tr>`;
   } else if (key === 'departments') {
     headers = ['DEPARTMENT', 'CODE', 'HEAD OF DEPARTMENT', 'STUDENTS', 'ACTIONS'];
     render = department => `<tr><td>${esc(department.name)}</td><td>${esc(department.code)}</td><td>${esc(department.head)}</td><td>${department.students}</td><td>${actionButton('edit', 'Edit', department.id)}${actionButton('delete', 'Delete', department.id)}</td></tr>`;
@@ -344,11 +372,10 @@ function attendancePage() {
 function attendanceForm() {
   const courses = scopedCourses();
   const firstCourse = courses[0]?.id || '';
-  const students = firstCourse ? studentsForCourse(firstCourse) : [];
   return `<form id="attendanceForm" class="inline-form">
     <label>Course<select name="course" required>${courses.map(course => `<option value="${esc(course.id)}">${esc(course.id)} · ${esc(course.title)}</option>`).join('')}</select></label>
-    <label>Class date<input type="date" name="date" value="${new Date().toISOString().slice(0, 10)}" required></label>
-    <label>Student<select name="studentId" required>${students.map(student => `<option value="${esc(student.id)}">${esc(student.name)} · ${esc(student.id)}</option>`).join('')}</select></label>
+    <label>Class date<input type="date" name="date" value="${localDateInputValue()}" required></label>
+    <label>Student<select name="studentId" required>${studentOptionsForCourse(firstCourse)}</select></label>
     <label>Status<select name="status"><option>Present</option><option>Absent</option><option>Late</option></select></label>
     <button class="primary-button" type="submit">Save attendance</button>
   </form>`;
@@ -359,7 +386,7 @@ function resultsPage() {
   const canEdit = canManageAcademicRecords();
   const headers = ['STUDENT', 'STUDENT ID', 'COURSE', 'ASSESSMENT', 'MARKS', 'GRADE', 'GRADE POINT', ...(canEdit ? ['ACTIONS'] : [])];
   const content = table(headers, rows.map(record => {
-    const canChange = isAdmin() || (activeRole === 'teacher' && scopedCourses().some(course => course.id === record.course) && workspaceData.enrollments.some(enrollment => enrollment.courseId === record.course && enrollment.studentId === record.studentId));
+    const canChange = isAdmin() || (activeRole === 'teacher' && scopedCourses().some(course => course.id === record.course) && workspaceData.enrollments.some(enrollment => enrollment.courseId === record.course && enrollment.studentId === record.studentId && enrollment.status === 'Active'));
     return `<tr><td>${esc(record.student)}</td><td>${esc(record.studentId)}</td><td>${esc(record.course)}</td><td>${esc(record.assessment)}</td><td>${record.marks}</td><td>${esc(record.grade)}</td><td>${Number(record.point || 0).toFixed(2)}</td>${canEdit ? `<td>${canChange ? actionButton('edit', 'Edit', record.id) : '—'}${isAdmin() ? actionButton('delete', 'Delete', record.id) : ''}</td>` : ''}</tr>`;
   }));
   return `${toolbar('Search results…')}${panel('Academic results', activeRole === 'student' ? 'Your assessment marks and grade points' : 'Student assessment marks and grade points', content)}${canEdit ? panel('Enter assessment result', 'Record marks for an enrolled student', gradeForm()) : ''}`;
@@ -368,10 +395,9 @@ function resultsPage() {
 function gradeForm() {
   const courses = scopedCourses();
   const firstCourse = courses[0]?.id || '';
-  const students = firstCourse ? studentsForCourse(firstCourse) : [];
   return `<form id="gradeForm" class="inline-form">
     <label>Course<select name="course" required>${courses.map(course => `<option value="${esc(course.id)}">${esc(course.id)} · ${esc(course.title)}</option>`).join('')}</select></label>
-    <label>Student<select name="studentId" required>${students.map(student => `<option value="${esc(student.id)}">${esc(student.name)} · ${esc(student.id)}</option>`).join('')}</select></label>
+    <label>Student<select name="studentId" required>${studentOptionsForCourse(firstCourse)}</select></label>
     <label>Assessment<input name="assessment" required maxlength="40" placeholder="Midterm"></label>
     <label>Marks<input name="marks" type="number" min="0" max="100" required></label>
     <button class="primary-button" type="submit">Save result</button>
@@ -496,8 +522,8 @@ function fieldsFor(key, record = {}) {
     ]
   };
   return (definitions[key] || []).map(([name, label, type, options]) => {
-    const value = record[name] ?? '';
-    if (key === 'courses' && name === 'teacherId') return `<label>${esc(label)}<select name="teacherId" required>${workspaceData.teachers.map(teacher => `<option value="${esc(teacher.id)}" ${teacher.id === value ? 'selected' : ''}>${esc(teacher.name)} · ${esc(teacher.id)}</option>`).join('')}</select></label>`;
+    const value = key === 'schedule' && name === 'courseId' ? (record.courseId ?? record.code ?? '') : (record[name] ?? '');
+    if (key === 'courses' && name === 'teacherId') return `<label>${esc(label)}<select name="teacherId"><option value="" ${!value ? 'selected' : ''}>Unassigned</option>${workspaceData.teachers.map(teacher => `<option value="${esc(teacher.id)}" ${teacher.id === value ? 'selected' : ''}>${esc(teacher.name)} · ${esc(teacher.id)}</option>`).join('')}</select></label>`;
     if (key === 'enrollments' && record.id && name === 'studentId') return `<label>${esc(label)}<input value="${esc(record.student)} · ${esc(record.studentId)}" readonly></label>`;
     if (key === 'enrollments' && record.id && name === 'courseId') return `<label>${esc(label)}<input value="${esc(record.course)} · ${esc(record.courseId)}" readonly></label>`;
     if (key === 'enrollments' && name === 'studentId') return `<label>${esc(label)}<select name="studentId" required>${workspaceData.students.map(student => `<option value="${esc(student.id)}" ${student.id === value ? 'selected' : ''}>${esc(student.name)} · ${esc(student.id)}</option>`).join('')}</select></label>`;
@@ -574,7 +600,8 @@ async function handleClick(event) {
       if (!canManageAcademicRecords()) return toast('You do not have permission to change attendance.');
       const row = workspaceData.attendance.find(record => String(record.id) === String(id));
       if (!row) return toast('Attendance record not found.');
-      const status = row.status === 'Present' ? 'Absent' : 'Present';
+      const statuses = ['Present', 'Absent', 'Late'];
+      const status = statuses[(statuses.indexOf(row.status) + 1) % statuses.length];
       await api.update('attendance', id, { status });
       await refreshWorkspace();
       renderPage();
@@ -586,10 +613,13 @@ async function handleClick(event) {
         [department.name, department.code, department.students, department.head].map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')
       )].join('\n');
       const anchor = document.createElement('a');
-      anchor.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      const fileUrl = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      anchor.href = fileUrl;
       anchor.download = 'lotus-department-report.csv';
+      document.body.append(anchor);
       anchor.click();
-      URL.revokeObjectURL(anchor.href);
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(fileUrl), 1000);
       return toast('Report exported.');
     }
   } catch (error) {
@@ -601,9 +631,12 @@ function updateCourseStudentOptions(form) {
   const courseId = form.elements.course.value;
   const studentSelect = form.elements.studentId;
   const selectedId = studentSelect.value;
-  const options = studentsForCourse(courseId);
-  studentSelect.replaceChildren(...options.map(student => new Option(`${student.name} · ${student.id}`, student.id)));
-  if (options.some(student => student.id === selectedId)) studentSelect.value = selectedId;
+  const students = studentsForCourse(courseId);
+  const options = students.length
+    ? students.map(student => new Option(`${student.name} · ${student.id}`, student.id))
+    : [new Option('No active students enrolled', '')];
+  studentSelect.replaceChildren(...options);
+  if (students.some(student => student.id === selectedId)) studentSelect.value = selectedId;
 }
 
 function bindPageForms() {
@@ -716,7 +749,11 @@ function bindGlobalEvents() {
     toast('You have been logged out.');
   });
 
-  $('#menuToggle').addEventListener('click', () => $('#sidebar').classList.toggle('sidebar-open'));
+  $('#menuToggle').addEventListener('click', () => setSidebarOpen(!$('#sidebar').classList.contains('sidebar-open')));
+  $('#sidebarBackdrop').addEventListener('click', () => setSidebarOpen(false));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && $('#sidebar').classList.contains('sidebar-open')) setSidebarOpen(false);
+  });
   $('#notificationButton').addEventListener('click', () => navigate(canSee('notices') ? 'notices' : 'dashboard'));
   window.addEventListener('ums-auth-expired', () => {
     activeRole = null;

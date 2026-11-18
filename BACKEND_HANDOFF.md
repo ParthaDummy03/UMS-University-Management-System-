@@ -5,7 +5,7 @@ The application now runs as a same-origin Python HTTP server with SQLite persist
 ## Roles
 
 | Role | Server access |
-|---|---| MIS + MISSES ARIF PAGLA MISSES PARTHO PAGLA ALSO
+|---|---|
 | `ADMIN` | All accounts, student/teacher profiles, departments, courses, enrollments, schedules, attendance, results, notices, complaints and reports. |
 | `TEACHER` | Read all student profiles and academic records. Read assigned courses, enrollments and schedules. Create/update attendance and results only for students actively enrolled in the teacher’s assigned courses. Read notices and aggregate reports. |
 | `STUDENT` | Read the session owner’s profile, enrollments, course schedule, attendance, results and complaints. Create own complaints and read student-facing notices. |

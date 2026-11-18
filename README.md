@@ -31,7 +31,8 @@ The backend applies role and record checks to each API request. Student record I
 - Searchable student and teacher directories, course and department management, enrollment management and schedule editing.
 - Attendance and grade entry with course enrollment checks and server-side grade calculation.
 - Audience-filtered notices, student-owned complaints, reports and CSV export.
-- Responsive layouts, input validation and explicit empty/error states.
+- Responsive layouts, mobile navigation, input validation and explicit empty/error states.
+- Animated page transitions and hover feedback, with reduced-motion support.
 
 ## Configuration and deployment
 

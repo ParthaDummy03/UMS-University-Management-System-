@@ -500,7 +500,7 @@ class UMSHandler(SimpleHTTPRequestHandler):
 
     @staticmethod
     def courses(db: sqlite3.Connection, user: dict | None = None) -> list[dict]:
-        sql = """SELECT c.*,d.name AS department,t.name AS teacher FROM courses c
+        sql = """SELECT DISTINCT c.*,d.name AS department,t.name AS teacher FROM courses c
             LEFT JOIN departments d ON d.id=c.department_id LEFT JOIN teachers t ON t.id=c.teacher_id"""
         args = []
         if user and user["role"] == "TEACHER":
@@ -531,7 +531,7 @@ class UMSHandler(SimpleHTTPRequestHandler):
 
     @staticmethod
     def schedules(db: sqlite3.Connection, user: dict | None = None) -> list[dict]:
-        sql = """SELECT sc.*,c.title AS course,c.teacher_id AS teacherId,t.name AS teacher
+        sql = """SELECT DISTINCT sc.*,c.title AS course,c.teacher_id AS teacherId,t.name AS teacher
             FROM schedule sc JOIN courses c ON c.id=sc.course_id LEFT JOIN teachers t ON t.id=c.teacher_id"""
         args = []
         if user and user["role"] == "TEACHER":

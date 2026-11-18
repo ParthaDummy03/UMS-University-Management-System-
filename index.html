@@ -34,13 +34,14 @@
   </main>
 
   <div class="app-shell" id="appShell" hidden>
+    <button type="button" class="sidebar-backdrop" id="sidebarBackdrop" aria-label="Close navigation" tabindex="-1"></button>
     <aside class="sidebar" id="sidebar"><a class="brand sidebar-brand" href="#dashboard" aria-label="Lotus University"><img src="assets/lotus-university-logo.png" alt="Lotus University"></a>
       <div class="sidebar-label">WORKSPACE</div><nav class="nav-list" id="mainNavigation" aria-label="Main navigation"></nav>
       <div class="sidebar-bottom"><div class="help-card"><div class="help-icon">?</div><strong>Need some help?</strong><p>Contact your university system support team.</p><a href="mailto:support@lotusuniversity.edu">Get support ↗</a></div>
         <div class="profile-mini"><div class="avatar avatar-blue" id="sideAvatar">LU</div><div><strong id="sideName">University user</strong><span id="sideRole">Account</span></div></div>
       </div>
     </aside>
-    <main class="main-area"><header class="topbar"><div class="topbar-left"><button class="icon-button menu-button" id="menuToggle" aria-label="Toggle navigation">☰</button><div class="breadcrumb">Workspace <span>/</span> <strong id="breadcrumbPage">Dashboard</strong></div></div>
+    <main class="main-area"><header class="topbar"><div class="topbar-left"><button class="icon-button menu-button" id="menuToggle" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="false">☰</button><div class="breadcrumb">Workspace <span>/</span> <strong id="breadcrumbPage">Dashboard</strong></div></div>
       <div class="topbar-actions"><button class="icon-button notification-button" id="notificationButton" aria-label="Notifications">♧</button><div class="topbar-divider"></div><div class="topbar-user"><div class="avatar avatar-blue" id="topbarAvatar">LU</div><div><strong id="topbarName">University user</strong><span id="topbarRole">Account</span></div><button class="icon-button logout-button" id="logoutButton" aria-label="Log out" title="Log out">↪</button></div></div></header>
       <section class="content" id="pageContent"><div class="welcome-row"><div><p class="eyebrow" id="todayLabel">LOTUS UNIVERSITY</p><h1 id="pageTitle">Dashboard</h1><p class="subheading" id="pageSubtitle"></p></div><div id="pageActions"></div></div><div id="pageBody"></div><footer class="footer"><span>© 2026 Lotus University Administration System</span><span>University administration workspace</span></footer></section>
     </main>
