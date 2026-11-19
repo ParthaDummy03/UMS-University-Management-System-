@@ -35,7 +35,15 @@ if os.environ.get('VERCEL') and not os.environ.get('DJANGO_SECRET_KEY'):
 
 DEBUG = os.environ.get('DJANGO_DEBUG', 'false' if os.environ.get('VERCEL') else 'true').lower() in ('1', 'true', 'yes')
 
-ALLOWED_HOSTS = config(ALLOWED_HOSTS").split(",") 
+ALLOWED_HOSTS = [
+    host.strip() for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
+    if host.strip()
+]
+for platform_host in (os.environ.get('RAILWAY_PUBLIC_DOMAIN'), os.environ.get('VERCEL_URL')):
+    if platform_host and platform_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(platform_host)
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',')
     if origin.strip()
