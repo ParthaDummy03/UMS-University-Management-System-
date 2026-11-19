@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import http.cookies
@@ -30,6 +31,7 @@ PASSWORD_ITERATIONS = 600_000
 ALLOWED_ROLES = {"ADMIN", "TEACHER", "STUDENT"}
 COOKIE_SECURE = os.environ.get("UMS_COOKIE_SECURE", "0") == "1"
 ALLOW_INITIAL_SETUP = os.environ.get("UMS_ALLOW_INITIAL_SETUP", "1") == "1"
+ALLOW_PUBLIC_REGISTRATION = os.environ.get("UMS_ALLOW_PUBLIC_REGISTRATION", "1") == "1"
 ATTEMPTS_LOCK = threading.Lock()
 
 
@@ -153,118 +155,32 @@ def init_db() -> None:
             created_at TEXT NOT NULL
         );
         """)
-        seed_sample_records(db)
-
-
-def seed_sample_records(db: sqlite3.Connection) -> None:
-    if db.execute("SELECT COUNT(*) FROM departments").fetchone()[0]:
-        return
-    departments = [
-        ("D01", "Computer Science & Engineering", "CSE", "Dr. Nadia Rahman"),
-        ("D02", "Business Administration", "BBA", "Dr. Farhan Ahmed"),
-        ("D03", "Electrical Engineering", "EEE", "Dr. Samira Karim"),
-        ("D04", "Economics", "ECO", "Dr. Imran Hossain"),
-        ("D05", "English", "ENG", "Dr. Tania Islam"),
-    ]
-    db.executemany("INSERT INTO departments(id,name,code,head) VALUES(?,?,?,?)", departments)
-    students = [
-        ("LU-2024-0841", "Sophia Rodriguez", "sophia.r@lotusuniversity.edu", "D01", "3rd Year", "6th", "CSE 6A", "Active", "+880 1712-000841"),
-        ("LU-2025-0840", "James Wilson", "james.w@lotusuniversity.edu", "D02", "2nd Year", "4th", "BBA 4A", "Active", "+880 1712-000840"),
-        ("LU-2023-0839", "Emily Chen", "emily.c@lotusuniversity.edu", "D04", "4th Year", "8th", "ECO 8A", "Pending", "+880 1712-000839"),
-        ("LU-2026-0838", "Michael Taylor", "michael.t@lotusuniversity.edu", "D03", "1st Year", "2nd", "EEE 2A", "Active", "+880 1712-000838"),
-        ("LU-2024-0712", "Ayesha Rahman", "ayesha.r@lotusuniversity.edu", "D01", "3rd Year", "6th", "CSE 6A", "Active", "+880 1811-000712"),
-        ("LU-2025-0650", "Tanvir Hasan", "tanvir.h@lotusuniversity.edu", "D05", "2nd Year", "4th", "ENG 4A", "Active", "+880 1911-000650"),
-    ]
-    db.executemany("""INSERT INTO students(id,name,email,department_id,year,semester,section,status,phone)
-        VALUES(?,?,?,?,?,?,?,?,?)""", students)
-    teachers = [
-        ("FAC-001", "Dr. Nadia Rahman", "nadia.r@lotusuniversity.edu", "D01", "Associate Professor", "Active"),
-        ("FAC-002", "Prof. Farhan Ahmed", "farhan.a@lotusuniversity.edu", "D02", "Professor", "Active"),
-        ("FAC-003", "Dr. Samira Karim", "samira.k@lotusuniversity.edu", "D03", "Assistant Professor", "Active"),
-        ("FAC-004", "Mr. Imran Hossain", "imran.h@lotusuniversity.edu", "D04", "Lecturer", "Active"),
-    ]
-    db.executemany("""INSERT INTO teachers(id,name,email,department_id,designation,status)
-        VALUES(?,?,?,?,?,?)""", teachers)
-    courses = [
-        ("CSE-310", "Data Structures & Algorithms", "D01", "FAC-001", 3, "6th"),
-        ("CSE-322", "Database Management Systems", "D01", "FAC-001", 3, "6th"),
-        ("CSE-201", "Object Oriented Programming", "D01", "FAC-001", 3, "4th"),
-        ("BBA-210", "Principles of Marketing", "D02", "FAC-002", 3, "4th"),
-        ("EEE-330", "Digital Signal Processing", "D03", "FAC-003", 3, "6th"),
-    ]
-    db.executemany("""INSERT INTO courses(id,title,department_id,teacher_id,credits,semester)
-        VALUES(?,?,?,?,?,?)""", courses)
-    enrollments = [
-        ("LU-2024-0841", "CSE-310", "6th", "CSE 6A"),
-        ("LU-2024-0841", "CSE-322", "6th", "CSE 6A"),
-        ("LU-2024-0712", "CSE-310", "6th", "CSE 6A"),
-        ("LU-2024-0712", "CSE-322", "6th", "CSE 6A"),
-        ("LU-2025-0840", "BBA-210", "4th", "BBA 4A"),
-    ]
-    db.executemany("INSERT INTO enrollments(student_id,course_id,semester,section) VALUES(?,?,?,?)", enrollments)
-    schedule_rows = [
-        ("CSE-310", "Sunday", "09:00", "10:30", "Room 402", "CSE 6A"),
-        ("CSE-322", "Sunday", "11:00", "12:30", "Lab 3", "CSE 6A"),
-        ("CSE-310", "Monday", "10:00", "11:30", "Room 402", "CSE 6A"),
-        ("CSE-322", "Tuesday", "09:00", "10:30", "Lab 3", "CSE 6A"),
-        ("CSE-201", "Tuesday", "13:00", "14:30", "Room 205", "CSE 4B"),
-        ("CSE-310", "Wednesday", "11:00", "12:30", "Room 402", "CSE 6A"),
-        ("CSE-322", "Thursday", "10:00", "11:30", "Lab 3", "CSE 6A"),
-        ("BBA-210", "Monday", "12:00", "13:30", "Room 104", "BBA 4A"),
-    ]
-    db.executemany("INSERT INTO schedule(course_id,day,start_time,end_time,room,section) VALUES(?,?,?,?,?,?)", schedule_rows)
-    enrollment_ids = {
-        (row["student_id"], row["course_id"]): row["id"]
-        for row in db.execute("SELECT id,student_id,course_id FROM enrollments")
-    }
-    attendance = [
-        ("LU-2024-0841", "CSE-310", "2026-11-16", "Present"),
-        ("LU-2024-0712", "CSE-310", "2026-11-16", "Present"),
-        ("LU-2024-0841", "CSE-322", "2026-11-15", "Absent"),
-        ("LU-2024-0712", "CSE-322", "2026-11-15", "Present"),
-        ("LU-2024-0841", "CSE-310", "2026-11-14", "Present"),
-        ("LU-2025-0840", "BBA-210", "2026-11-16", "Present"),
-    ]
-    db.executemany("INSERT INTO attendance(enrollment_id,class_date,status) VALUES(?,?,?)",
-        [(enrollment_ids[(student, course)], class_date, status) for student, course, class_date, status in attendance])
-    grades = [
-        ("LU-2024-0841", "CSE-310", "Midterm", 86, "A", 3.75),
-        ("LU-2024-0841", "CSE-322", "Midterm", 91, "A+", 4.0),
-        ("LU-2024-0712", "CSE-310", "Midterm", 78, "A-", 3.5),
-        ("LU-2025-0840", "BBA-210", "Midterm", 82, "A-", 3.5),
-    ]
-    db.executemany("""INSERT INTO grades(enrollment_id,assessment,marks,grade,point)
-        VALUES(?,?,?,?,?)""", [(enrollment_ids[(student, course)], assessment, marks, grade, point)
-        for student, course, assessment, marks, grade, point in grades])
-    notices = [
-        ("N-101", "Fall semester examination schedule published", "Academic", "All users", "The final examination schedule is now available from the examination office.", "2026-11-16"),
-        ("N-102", "Campus maintenance announcement", "General", "All users", "Selected campus facilities will undergo scheduled maintenance this weekend.", "2026-11-14"),
-        ("N-103", "Annual research symposium registration", "Event", "Students and Faculty", "Registration is open for the annual research symposium.", "2026-11-12"),
-        ("N-104", "Faculty meeting", "Academic", "Faculty", "Faculty members are invited to the academic planning meeting.", "2026-11-12"),
-    ]
-    db.executemany("""INSERT INTO notices(id,title,category,audience,body,published_at)
-        VALUES(?,?,?,?,?,?)""", notices)
-    complaints = [
-        ("CMP-001", "LU-2024-0841", "Classroom projector issue", "Facilities", "The projector in Room 402 is not working.", "In Review", "2026-11-13"),
-        ("CMP-002", "LU-2024-0712", "Course registration question", "Academic", "Please clarify the prerequisite for CSE-322.", "Resolved", "2026-11-10"),
-    ]
-    db.executemany("""INSERT INTO complaints(id,student_id,subject,category,details,status,created_at)
-        VALUES(?,?,?,?,?,?,?)""", complaints)
 
 
 def hash_password(password: str) -> str:
-    salt = secrets.token_bytes(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PASSWORD_ITERATIONS)
-    return f"pbkdf2_sha256${PASSWORD_ITERATIONS}${salt.hex()}${digest.hex()}"
+    salt = secrets.token_urlsafe(12)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), PASSWORD_ITERATIONS)
+    return f"pbkdf2_sha256${PASSWORD_ITERATIONS}${salt}${base64.b64encode(digest).decode().strip()}"
 
 
 def verify_password(password: str, stored: str) -> bool:
+    # Supports the Django pbkdf2_sha256 format used by the seeded database and the legacy hex format.
     try:
-        algorithm, iterations, salt_hex, digest_hex = stored.split("$", 3)
+        algorithm, iterations, salt, digest = stored.split("$", 3)
         if algorithm != "pbkdf2_sha256":
             return False
-        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), int(iterations))
-        return hmac.compare_digest(digest.hex(), digest_hex)
+        iterations = int(iterations)
+    except (ValueError, TypeError, AttributeError):
+        return False
+    try:
+        raw = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations)
+        if hmac.compare_digest(base64.b64encode(raw).decode().strip(), digest.strip()):
+            return True
+    except (ValueError, TypeError):
+        pass
+    try:
+        raw = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt), iterations)
+        return hmac.compare_digest(raw.hex(), digest)
     except (ValueError, TypeError):
         return False
 
@@ -296,7 +212,15 @@ def email_text(value, required: bool = True) -> str:
 
 
 def department_id(db: sqlite3.Connection, name: str) -> str:
-    row = db.execute("SELECT id FROM departments WHERE name=? OR code=? OR id=?", (name, name, name)).fetchone()
+    row = db.execute(
+        "SELECT id FROM departments WHERE lower(name)=lower(?) OR lower(code)=lower(?) OR lower(id)=lower(?)",
+        (name, name, name),
+    ).fetchone()
+    if not row:
+        row = db.execute(
+            "SELECT id FROM departments WHERE lower(name) LIKE ? OR lower(code) LIKE ? LIMIT 1",
+            (f"%{name.lower()}%", f"%{name.lower()}%"),
+        ).fetchone()
     if not row:
         raise AppError(400, "VALIDATION_ERROR", "Select a valid department.", {"department": "Unknown department."})
     return row["id"]
@@ -548,10 +472,14 @@ class UMSHandler(SimpleHTTPRequestHandler):
     @staticmethod
     def attendance(db: sqlite3.Connection, user: dict | None = None) -> list[dict]:
         sql = """SELECT a.*,e.student_id AS studentId,e.course_id AS course,s.name AS student
-            FROM attendance a JOIN enrollments e ON e.id=a.enrollment_id JOIN students s ON s.id=e.student_id"""
+            FROM attendance a JOIN enrollments e ON e.id=a.enrollment_id JOIN students s ON s.id=e.student_id
+            JOIN courses c ON c.id=e.course_id"""
         args = []
         if user and user["role"] == "STUDENT":
             sql += " WHERE s.user_id=?"
+            args.append(user["accountId"])
+        elif user and user["role"] == "TEACHER":
+            sql += " WHERE c.teacher_id=(SELECT id FROM teachers WHERE user_id=?)"
             args.append(user["accountId"])
         sql += " ORDER BY a.class_date DESC,a.id DESC"
         return [{"id": r["id"], "date": r["class_date"], "studentId": r["studentId"], "student": r["student"], "course": r["course"], "status": r["status"]} for r in db.execute(sql, args).fetchall()]
@@ -559,10 +487,14 @@ class UMSHandler(SimpleHTTPRequestHandler):
     @staticmethod
     def grades(db: sqlite3.Connection, user: dict | None = None) -> list[dict]:
         sql = """SELECT g.*,e.student_id AS studentId,e.course_id AS course,s.name AS student
-            FROM grades g JOIN enrollments e ON e.id=g.enrollment_id JOIN students s ON s.id=e.student_id"""
+            FROM grades g JOIN enrollments e ON e.id=g.enrollment_id JOIN students s ON s.id=e.student_id
+            JOIN courses c ON c.id=e.course_id"""
         args = []
         if user and user["role"] == "STUDENT":
             sql += " WHERE s.user_id=?"
+            args.append(user["accountId"])
+        elif user and user["role"] == "TEACHER":
+            sql += " WHERE c.teacher_id=(SELECT id FROM teachers WHERE user_id=?)"
             args.append(user["accountId"])
         sql += " ORDER BY g.id DESC"
         return [{"id": r["id"], "studentId": r["studentId"], "student": r["student"], "course": r["course"],
@@ -629,6 +561,8 @@ class UMSHandler(SimpleHTTPRequestHandler):
             return self.setup_admin(body)
         if path == "/api/auth/login" and method == "POST":
             return self.login(body)
+        if path == "/api/auth/register" and method == "POST":
+            return self.register(body)
         if path == "/api/auth/me" and method == "GET":
             return 200, {"user": self.session_user()}, []
         if path == "/api/auth/logout" and method == "POST":
@@ -718,6 +652,44 @@ class UMSHandler(SimpleHTTPRequestHandler):
                 cookie = self.create_session(db, user["id"])
                 return 200, {"user": self.user_payload(db, user)}, [cookie]
         raise AppError(401, "INVALID_CREDENTIALS", "The email/ID or password is incorrect.")
+
+    def register(self, body: dict):
+        # Public self-registration creates a STUDENT account and links a student profile.
+        if not ALLOW_PUBLIC_REGISTRATION:
+            raise AppError(403, "REGISTRATION_DISABLED", "Public registration is disabled on this server.")
+        university_id = clean_text(body.get("universityId"), "universityId", 40)
+        name = clean_text(body.get("name"), "name")
+        email = email_text(body.get("email"))
+        password = required_password(body.get("password"))
+        department = clean_text(body.get("department"), "department", 120, False)
+        with connect_db() as db:
+            dept_id = department_id(db, department) if department else None
+            db.execute("BEGIN IMMEDIATE")
+            if db.execute(
+                "SELECT COUNT(*) FROM users WHERE lower(university_id)=? OR lower(email)=?",
+                (university_id.lower(), email),
+            ).fetchone()[0]:
+                raise AppError(409, "DUPLICATE_ACCOUNT", "This university ID or email is already registered.")
+            cursor = db.execute(
+                """INSERT INTO users(university_id,email,name,role,password_hash,status,created_at)
+                VALUES(?,?,?,'STUDENT',?,'Active',?)""",
+                (university_id, email, name, hash_password(password), utc_now()),
+            )
+            account_id = cursor.lastrowid
+            existing = db.execute("SELECT id FROM students WHERE id=?", (university_id,)).fetchone()
+            if existing:
+                db.execute(
+                    "UPDATE students SET user_id=?,name=?,email=?,department_id=COALESCE(?,department_id),status='Active' WHERE id=?",
+                    (account_id, name, email, dept_id, university_id),
+                )
+            else:
+                db.execute(
+                    "INSERT INTO students(id,user_id,name,email,department_id,year,semester,section,status,phone) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (university_id, account_id, name, email, dept_id, "", "", "", "Active", ""),
+                )
+            row = db.execute("SELECT * FROM users WHERE id=?", (account_id,)).fetchone()
+            cookie = self.create_session(db, account_id)
+            return 201, {"user": self.user_payload(db, row)}, [cookie]
 
     def logout(self):
         cookie = http.cookies.SimpleCookie()
@@ -824,8 +796,8 @@ class UMSHandler(SimpleHTTPRequestHandler):
                 "enrollments": "enrollments", "schedule": "schedule", "attendance": "attendance", "grades": "grades", "notices": "notices"}.get(resource)
             if not table: raise AppError(405, "METHOD_NOT_ALLOWED", "This record cannot be deleted.")
             if resource in ("students", "teachers"):
-                db.execute(f"UPDATE {table} SET status='Inactive' WHERE id=?", (item_id,))
-                if db.total_changes == 0: raise AppError(404, "NOT_FOUND", "Record not found.")
+                cursor = db.execute(f"UPDATE {table} SET status='Inactive' WHERE id=?", (item_id,))
+                if cursor.rowcount == 0: raise AppError(404, "NOT_FOUND", "Record not found.")
             else:
                 cursor = db.execute(f"DELETE FROM {table} WHERE id=?", (item_id,))
                 if cursor.rowcount == 0: raise AppError(404, "NOT_FOUND", "Record not found.")
@@ -940,8 +912,8 @@ class UMSHandler(SimpleHTTPRequestHandler):
     def create_schedule(self, db, body):
         course=clean_text(body.get("courseId"),"courseId",40); day=clean_text(body.get("day"),"day",20); start=clean_text(body.get("start"),"start",5); end=clean_text(body.get("end"),"end",5); room=clean_text(body.get("room"),"room",80,False); section=clean_text(body.get("section"),"section",40,False)
         self.validate_times(start,end)
-        db.execute("INSERT INTO schedule(course_id,day,start_time,end_time,room,section) VALUES(?,?,?,?,?,?)",(course,day,start,end,room,section))
-        return next(row for row in self.schedules(db) if row["id"]==db.execute("SELECT last_insert_rowid()").fetchone()[0])
+        cursor = db.execute("INSERT INTO schedule(course_id,day,start_time,end_time,room,section) VALUES(?,?,?,?,?,?)",(course,day,start,end,room,section))
+        return next(row for row in self.schedules(db) if row["id"]==cursor.lastrowid)
 
     @staticmethod
     def validate_times(start,end):

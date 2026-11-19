@@ -47,6 +47,9 @@ const api = {
     async login(credentials) {
       return requestApi('/api/auth/login', { method: 'POST', body: JSON.stringify(credentials) });
     },
+    async register(credentials) {
+      return requestApi('/api/auth/register', { method: 'POST', body: JSON.stringify(credentials) });
+    },
     async logout() {
       return requestApi('/api/auth/logout', { method: 'POST', body: '{}' });
     }

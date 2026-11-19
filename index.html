@@ -18,6 +18,20 @@
         <div class="login-options"><span></span><button type="button" class="text-button" id="forgotPasswordButton">Forgot password?</button></div>
         <button class="primary-button login-submit" type="submit">Login <span>→</span></button>
         <p class="form-feedback" id="loginFeedback" role="status" aria-live="polite"></p>
+        <p class="auth-switch">Don't have an account? <button type="button" class="text-button" id="showRegisterButton">Create one</button></p>
+      </form>
+      <form id="registerForm" novalidate hidden>
+        <p class="eyebrow">STUDENT REGISTRATION</p>
+        <h2>Create your account</h2>
+        <label for="registerName">Full name</label><input id="registerName" name="name" autocomplete="name" required maxlength="120">
+        <label for="registerUniversityId">University ID</label><input id="registerUniversityId" name="universityId" placeholder="e.g. 223933218" required maxlength="40">
+        <label for="registerEmail">University email</label><input id="registerEmail" name="email" type="email" autocomplete="email" placeholder="name@student.lotus.edu" required maxlength="160">
+        <label for="registerDepartment">Department</label><select id="registerDepartment" name="department"><option value="">Not listed / other</option><option value="Computer Science and Engineering">Computer Science and Engineering</option><option value="Electrical and Electronic Engineering">Electrical and Electronic Engineering</option><option value="Economics">Economics</option><option value="English">English</option><option value="Social Economics">Social Economics</option></select>
+        <label for="registerPassword">Password (12 characters minimum)</label><input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="12" required maxlength="128">
+        <label for="registerPasswordConfirm">Confirm password</label><input id="registerPasswordConfirm" name="passwordConfirm" type="password" autocomplete="new-password" minlength="12" required maxlength="128">
+        <button class="primary-button login-submit" type="submit">Create account <span>→</span></button>
+        <p class="form-feedback" id="registerFeedback" role="status" aria-live="polite"></p>
+        <p class="auth-switch">Already have an account? <button type="button" class="text-button" id="showLoginButton">Sign in</button></p>
       </form>
       <form id="setupForm" novalidate hidden>
         <p class="eyebrow">FIRST TIME SETUP</p>

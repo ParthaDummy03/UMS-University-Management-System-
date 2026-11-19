@@ -51,6 +51,12 @@ let pageAnimationTimer = null;
 let searchTerm = '';
 let dialogContext = null;
 
+const PAGE_SIZE = 25;
+let pageIndex = 1;
+
+// Lotus University runs its academic week from Saturday to Thursday.
+const weekDays = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[char]));
@@ -222,6 +228,7 @@ function navigate(page) {
   }
   activePage = page;
   searchTerm = '';
+  pageIndex = 1;
   $$('.nav-link').forEach(link => link.classList.toggle('active', link.dataset.page === page));
   $('#breadcrumbPage').textContent = pageMeta[page][0];
   $('#pageTitle').textContent = pageMeta[page][0];
@@ -244,6 +251,19 @@ function panel(title, subtitle, body, extra = '') {
 function table(headers, rows) {
   if (!rows.length) return '<div class="empty-state">No records found.</div>';
   return `<div class="table-scroll"><table><thead><tr>${headers.map(header => `<th>${esc(header)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+}
+
+// Large collections (tens of thousands of rows) are rendered one page at a time so the
+// browser stays responsive.
+function paginate(rows) {
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  pageIndex = Math.min(Math.max(1, pageIndex), pageCount);
+  const start = (pageIndex - 1) * PAGE_SIZE;
+  const controls = rows.length <= PAGE_SIZE ? '' : `<div class="pagination">
+    <button type="button" class="secondary-button" data-action="page" data-page-num="${pageIndex - 1}" ${pageIndex <= 1 ? 'disabled' : ''}>← Previous</button>
+    <span>Page ${pageIndex} of ${pageCount} · ${rows.length} records</span>
+    <button type="button" class="secondary-button" data-action="page" data-page-num="${pageIndex + 1}" ${pageIndex >= pageCount ? 'disabled' : ''}>Next →</button></div>`;
+  return { page: rows.slice(start, start + PAGE_SIZE), controls };
 }
 
 function actionButton(action, label, id = '', kind = 'secondary-button') {
@@ -354,19 +374,21 @@ function directoryPage(key) {
   }
 
   const filtered = rows.filter(row => JSON.stringify(row).toLowerCase().includes(searchTerm));
-  return `${toolbar(`Search ${key}…`, addLabel)}${panel(pageMeta[key][0], `${filtered.length} records`, table(headers, filtered.map(render)))}`;
+  const { page, controls } = paginate(filtered);
+  return `${toolbar(`Search ${key}…`, addLabel)}${panel(pageMeta[key][0], `${filtered.length} records`, table(headers, page.map(render)) + controls)}`;
 }
 
 function attendancePage() {
-  const rows = scopedAttendance().filter(record => JSON.stringify(record).toLowerCase().includes(searchTerm));
+  const filtered = scopedAttendance().filter(record => JSON.stringify(record).toLowerCase().includes(searchTerm));
+  const { page, controls } = paginate(filtered);
   const canMark = canManageAcademicRecords();
   const headers = ['DATE', 'STUDENT', 'STUDENT ID', 'COURSE', 'STATUS', ...(canMark ? ['ACTION'] : [])];
-  const content = table(headers, rows.map(record => {
+  const content = table(headers, page.map(record => {
     const canChange = isAdmin() || (activeRole === 'teacher' && scopedCourses().some(course => course.id === record.course) && studentsForCourse(record.course).some(student => student.id === record.studentId));
     const action = canMark ? `<td>${canChange ? `${actionButton('toggle-attendance', 'Change', record.id)}${isAdmin() ? actionButton('delete', 'Delete', record.id) : ''}` : '—'}</td>` : '';
     return `<tr><td>${esc(record.date)}</td><td>${esc(record.student)}</td><td>${esc(record.studentId)}</td><td>${esc(record.course)}</td><td><span class="status status-${safeClass(record.status)}">${esc(record.status)}</span></td>${action}</tr>`;
   }));
-  return `${toolbar('Search attendance…')}${panel('Attendance records', activeRole === 'student' ? 'Your recorded class attendance' : 'Attendance records for students', content)}${canMark ? panel('Mark class attendance', 'Choose a course, date and enrolled student', attendanceForm()) : ''}`;
+  return `${toolbar('Search attendance…')}${panel('Attendance records', activeRole === 'student' ? 'Your recorded class attendance' : 'Attendance records for students', content + controls)}${canMark ? panel('Mark class attendance', 'Choose a course, date and enrolled student', attendanceForm()) : ''}`;
 }
 
 function attendanceForm() {
@@ -382,14 +404,15 @@ function attendanceForm() {
 }
 
 function resultsPage() {
-  const rows = scopedGrades().filter(record => JSON.stringify(record).toLowerCase().includes(searchTerm));
+  const filtered = scopedGrades().filter(record => JSON.stringify(record).toLowerCase().includes(searchTerm));
+  const { page, controls } = paginate(filtered);
   const canEdit = canManageAcademicRecords();
   const headers = ['STUDENT', 'STUDENT ID', 'COURSE', 'ASSESSMENT', 'MARKS', 'GRADE', 'GRADE POINT', ...(canEdit ? ['ACTIONS'] : [])];
-  const content = table(headers, rows.map(record => {
+  const content = table(headers, page.map(record => {
     const canChange = isAdmin() || (activeRole === 'teacher' && scopedCourses().some(course => course.id === record.course) && workspaceData.enrollments.some(enrollment => enrollment.courseId === record.course && enrollment.studentId === record.studentId && enrollment.status === 'Active'));
     return `<tr><td>${esc(record.student)}</td><td>${esc(record.studentId)}</td><td>${esc(record.course)}</td><td>${esc(record.assessment)}</td><td>${record.marks}</td><td>${esc(record.grade)}</td><td>${Number(record.point || 0).toFixed(2)}</td>${canEdit ? `<td>${canChange ? actionButton('edit', 'Edit', record.id) : '—'}${isAdmin() ? actionButton('delete', 'Delete', record.id) : ''}</td>` : ''}</tr>`;
   }));
-  return `${toolbar('Search results…')}${panel('Academic results', activeRole === 'student' ? 'Your assessment marks and grade points' : 'Student assessment marks and grade points', content)}${canEdit ? panel('Enter assessment result', 'Record marks for an enrolled student', gradeForm()) : ''}`;
+  return `${toolbar('Search results…')}${panel('Academic results', activeRole === 'student' ? 'Your assessment marks and grade points' : 'Student assessment marks and grade points', content + controls)}${canEdit ? panel('Enter assessment result', 'Record marks for an enrolled student', gradeForm()) : ''}`;
 }
 
 function gradeForm() {
@@ -405,7 +428,7 @@ function gradeForm() {
 }
 
 function schedulePage() {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+  const days = weekDays;
   const schedule = scopedSchedule().filter(item => JSON.stringify(item).toLowerCase().includes(searchTerm));
   const admin = isAdmin();
   const body = days.map(day => {
@@ -514,7 +537,7 @@ function fieldsFor(key, record = {}) {
     ],
     schedule: [
       ['courseId', 'Course', 'select', workspaceData.courses.map(item => item.id)],
-      ['day', 'Day', 'select', ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']],
+      ['day', 'Day', 'select', weekDays],
       ['start', 'Start time', 'time'], ['end', 'End time', 'time'], ['room', 'Room', 'text'], ['section', 'Section', 'text']
     ],
     grades: [
@@ -571,6 +594,12 @@ async function handleClick(event) {
   if (!button) return;
   const { action, id, page } = button.dataset;
   if (action === 'navigate') return navigate(page);
+  if (action === 'page') {
+    pageIndex = Number(button.dataset.pageNum) || 1;
+    renderPage();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
   if (action === 'add') {
     return openRecordDialog(activePage);
   }
@@ -644,6 +673,7 @@ function bindPageForms() {
   body.oninput = event => {
     if (!event.target.matches('.table-search')) return;
     searchTerm = event.target.value.toLowerCase();
+    pageIndex = 1;
     const value = event.target.value;
     renderPage();
     const input = $('.table-search');
@@ -658,7 +688,7 @@ function bindPageForms() {
     updateCourseStudentOptions(event.target.form);
   };
   body.onclick = event => { void handleClick(event); };
-  body.onsubmit = async event => {
+  body.addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.target;
     if (form.id === 'attendanceForm') {
@@ -679,7 +709,31 @@ function bindPageForms() {
         return toast('Result saved.');
       } catch (error) { return toast(error.message); }
     }
-  };
+  });
+}
+
+function showAuthForm(which = 'login') {
+  const login = $('#loginForm');
+  const register = $('#registerForm');
+  const setup = $('#setupForm');
+  const title = $('#loginTitle');
+  const intro = $('#loginIntro');
+  login.hidden = which !== 'login';
+  register.hidden = which !== 'register';
+  setup.hidden = which !== 'setup';
+  $('#loginFeedback').textContent = '';
+  $('#registerFeedback').textContent = '';
+  $('#setupFeedback').textContent = '';
+  if (which === 'register') {
+    title.textContent = 'Create your account';
+    intro.textContent = 'Register a student account to access the Lotus University workspace.';
+  } else if (which === 'setup') {
+    title.textContent = 'Set up the system';
+    intro.textContent = 'Create the first administrator account. Only one account can complete this setup.';
+  } else {
+    title.textContent = 'Welcome back';
+    intro.textContent = 'Sign in with your university credentials to continue.';
+  }
 }
 
 function bindGlobalEvents() {
@@ -706,6 +760,41 @@ function bindGlobalEvents() {
       submit.disabled = false;
     }
   });
+
+  $('#registerForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const value = formObject(form);
+    if (value.password !== value.passwordConfirm) {
+      $('#registerFeedback').textContent = 'The passwords do not match.';
+      return;
+    }
+    const payload = {
+      name: value.name,
+      universityId: value.universityId,
+      email: value.email,
+      password: value.password
+    };
+    if (value.department?.trim()) payload.department = value.department.trim();
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
+    try {
+      const result = await api.auth.register(payload);
+      const user = result?.user;
+      const role = normalizeRole(user?.role);
+      if (!user || !role || !user.id) throw new Error('Registration succeeded but the account could not be loaded.');
+      activeRole = role;
+      await mountShell(user);
+    } catch (error) {
+      $('#registerFeedback').textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  $('#showRegisterButton').addEventListener('click', () => showAuthForm('register'));
+  $('#showLoginButton').addEventListener('click', () => showAuthForm('login'));
 
   $('#setupForm').addEventListener('submit', async event => {
     event.preventDefault();
@@ -742,10 +831,7 @@ function bindGlobalEvents() {
     $('#loginScreen').hidden = false;
     history.replaceState(null, '', location.pathname);
     $('#loginPassword').value = '';
-    $('#loginForm').hidden = false;
-    $('#setupForm').hidden = true;
-    $('#loginTitle').textContent = 'Welcome back';
-    $('#loginIntro').textContent = 'Sign in with your university credentials to continue.';
+    showAuthForm('login');
     toast('You have been logged out.');
   });
 
@@ -763,8 +849,7 @@ function bindGlobalEvents() {
     Object.keys(workspaceData).forEach(key => { workspaceData[key] = []; });
     $('#appShell').hidden = true;
     $('#loginScreen').hidden = false;
-    $('#loginForm').hidden = false;
-    $('#setupForm').hidden = true;
+    showAuthForm('login');
     $('#loginFeedback').textContent = 'Your session expired. Sign in again.';
     history.replaceState(null, '', location.pathname);
   });
@@ -809,10 +894,7 @@ async function initialize() {
     }
     const setup = await api.auth.setupStatus();
     if (setup.required) {
-      $('#loginForm').hidden = true;
-      $('#setupForm').hidden = false;
-      $('#loginTitle').textContent = 'Set up the system';
-      $('#loginIntro').textContent = 'Create the first administrator account. Only one account can complete this setup.';
+      showAuthForm('setup');
     }
   } catch (error) {
     $('#loginFeedback').textContent = `Cannot connect to the UMS server. Start the project with python server.py. (${error.message})`;
