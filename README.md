@@ -2,7 +2,7 @@
 
 University administration app with separate Admin, Teacher and Student workspaces. It uses the existing HTML/CSS/vanilla JavaScript frontend, a Python standard-library web server and SQLite persistence. There are no package installs or build step.
 
-## Run locally
+## Run locallyyy
 
 1. Install Python 3.10 or newer.
 2. Open PowerShell in this project folder.
