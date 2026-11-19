@@ -1,16 +1,26 @@
 # Lotus University Administration System
 
-University administration app with separate Admin, Teacher and Student workspaces. It uses the existing HTML/CSS/vanilla JavaScript frontend, a Python standard-library web server and SQLite persistence. There are no package installs or build step.
+University administration app with separate Admin, Teacher and Student workspaces. It uses the existing HTML/CSS/vanilla JavaScript frontend, a Python standard-library web server and MySql persistence. There are no package installs or build step.
 
 ## Run locally
 
-1. Install Python 3.10 or newer.
+1. Install Django>=5.2,<6. mysqlclient>=2.2.1
 2. Open PowerShell in this project folder.
-3. Run `python server.py`.
+3. Run '.\venv\Scripts\python.exe manage.py runserver'
 4. Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
-5. On first launch, create the initial Admin account. Use a strong password with at least 12 characters.
 
-The database is created at `data/lotus_ums.sqlite3` and is seeded with sample university records. It contains no preconfigured accounts or shared passwords. After signing in as Admin, open **Accounts** to create Teacher and Student logins. Link an account to an existing profile by using the same university ID, or let the account form create a profile. Add course registrations under **Enrollments**.
+Admin: admin01@lotus.edu  
+Pass: Lotus@123
+
+(01-30 Admin)
+
+
+Student: youreduid@@lotus.edu
+Pass: Lotus@123
+
+Teacher:orin.roy@lotus.edu
+Pass: Lotus@123
+
 
 ## Workspaces
 
