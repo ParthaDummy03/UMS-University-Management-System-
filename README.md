@@ -24,6 +24,10 @@ Every seeded account uses the same password: **`Lotus@123`**.
 
 University IDs follow a fixed scheme: students are 9 digits (first 2 = admission year, last 2 = department code), teachers are `F` + department code + 3 digits, and admins are `A001`–`A030`. Department codes: CSE `12`, EEE `10`, Economics `14`, English `16`, Social Economics `18`.
 
+### Create a new student account
+
+Instead of signing in with a seeded account, click **"Create one"** on the login screen to self-register a new student account. The form asks for your full name, university ID, university email, department (optional), and a password (12 characters minimum). On success the account is created, linked to a student profile, and you are signed in automatically. Public registration can be disabled with `UMS_ALLOW_PUBLIC_REGISTRATION=0`.
+
 ## Dataset
 
 | Collection | Records |
@@ -51,6 +55,7 @@ The backend applies role and record checks to each API request. Student record I
 ## Features
 
 - University ID/email login, logout and server-managed sessions.
+- Student self-registration (`/api/auth/register`) with auto sign-in; admins can also create any role from the Accounts page.
 - Passwords hashed with PBKDF2-HMAC-SHA256; sign-in attempts are rate-limited.
 - SQLite storage for users, profiles, departments, courses, enrollments, schedules, attendance, grades, notices and complaints.
 - Admin account creation, profile linking and password reset.
@@ -63,8 +68,8 @@ The backend applies role and record checks to each API request. Student record I
 
 ## Configuration and deployment
 
-The server binds to `127.0.0.1:8000` by default. Set `UMS_HOST` and `UMS_PORT` to change the listener; set `UMS_DB_PATH` to change the database path. Set `UMS_ALLOW_INITIAL_SETUP=0` to disable first-Admin setup. For HTTPS behind a trusted reverse proxy, set `UMS_COOKIE_SECURE=1`.
+The server binds to `127.0.0.1:8000` by default. Set `UMS_HOST` and `UMS_PORT` to change the listener; set `UMS_DB_PATH` to change the database path. Set `UMS_ALLOW_INITIAL_SETUP=0` to disable first-Admin setup. Set `UMS_ALLOW_PUBLIC_REGISTRATION=0` to disable student self-registration on the login screen. For HTTPS behind a trusted reverse proxy, set `UMS_COOKIE_SECURE=1`.
 
-This built-in server is intended for local development. Before public deployment, put the app behind a production WSGI server and TLS reverse proxy, disable first-admin setup, configure backups, and add an email-based password recovery flow. The bundled records are demonstration data — never use them as real student data.
+This built-in server is intended for local development. Before public deployment, put the app behind a production WSGI server and TLS reverse proxy, disable first-admin setup and public registration, configure backups, and add an email-based password recovery flow. The bundled records are demonstration data — never use them as real student data.
 
 See [`BACKEND_HANDOFF.md`](BACKEND_HANDOFF.md) for the API and permission model.
