@@ -1,53 +1,43 @@
-# Lotus University Administration System
+# Lotus University Management System
 
-University administration app with separate Admin, Teacher and Student workspaces. It uses the existing HTML/CSS/vanilla JavaScript frontend, a Python standard-library web server and MySql persistence. There are no package installs or build step.
+Django application with a vanilla JavaScript frontend and MySQL database.
 
 ## Run locally
 
-1. Install Django>=5.2,<6. mysqlclient>=2.2.1
-2. Open PowerShell in this project folder.
-3. Run '.\venv\Scripts\python.exe manage.py runserver'
-4. Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
+1. Create a virtual environment and install dependencies:
 
-Admin: admin01@lotus.edu  
-Pass: Lotus@123
+   ```powershell
+   py -m venv venv
+   .\venv\Scripts\python.exe -m pip install -r requirements.txt
+   ```
 
-(01-30 Admin)
+2. Copy `.env.example` to `.env` and set the local MySQL connection values and a development secret.
+3. Start the app:
 
+   ```powershell
+   .\venv\Scripts\python.exe manage.py runserver
+   ```
 
-Student: youreduid@@lotus.edu
-Pass: Lotus@123
+Open `http://127.0.0.1:8000`. The sample login data in the SQL seed file is for local development only; set new passwords before deploying real data.
 
-Teacher:orin.roy@lotus.edu
-Pass: Lotus@123
+## Database setup
 
+For a new, empty local database, run `01_schema.sql`, then `02_seed_data.sql`, then `03_alter_and_fill.sql` in that order. **The first script drops and recreates `lotus_university`; do not run it on a database containing data you need to keep.**
 
-## Workspaces
+For an existing database, only apply the migration steps that have not already been applied. The current application expects the additions in `03_alter_and_fill.sql`.
 
-| Role | Main access |
-|---|---|
-| Admin | All modules: accounts, students, teachers, departments, courses, enrollments, attendance, results, schedule, notices, complaints and reports. Admin can create and maintain records. |
-| Teacher | Read the full student directory and academic records. Record or update attendance/results only for students enrolled in assigned courses. See assigned courses, schedules and reports. |
-| Student | Read only their own profile, enrolled courses, section schedule, attendance, results and complaints. Submit their own complaints and read student notices. |
+## Deploy to Vercel
 
-The backend applies role and record checks to each API request. Student record IDs and teacher course assignments are resolved from the signed-in session.
+Vercel detects Django from `manage.py`. Import the repository in Vercel and set the following project environment variables for Preview and Production:
 
-## Features
+- `DJANGO_SECRET_KEY`: a new, randomly generated secret
+- `DJANGO_DEBUG`: `false`
+- `DJANGO_ALLOWED_HOSTS`: `.vercel.app` and any custom domain hostnames, comma-separated
+- `DJANGO_CSRF_TRUSTED_ORIGINS`: full `https://` origins for the Vercel and custom domains, comma-separated
+- `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_HOST`, `MYSQL_PORT`: connection details for a hosted MySQL database
 
-- First-admin setup, university ID/email login, logout and server-managed sessions.
-- Passwords hashed with PBKDF2; sign-in attempts are rate-limited.
-- SQLite storage for users, profiles, departments, courses, enrollments, schedules, attendance, grades, notices and complaints.
-- Admin account creation, profile linking and password reset.
-- Searchable student and teacher directories, course and department management, enrollment management and schedule editing.
-- Attendance and grade entry with course enrollment checks and server-side grade calculation.
-- Audience-filtered notices, student-owned complaints, reports and CSV export.
-- Responsive layouts, mobile navigation, input validation and explicit empty/error states.
-- Animated page transitions and hover feedback, with reduced-motion support.
+The database must accept connections from the deployed application. `localhost` refers to the Vercel function, not your computer. Import the schema and data into the hosted database before serving traffic. Never commit `.env` or use the sample account passwords in production. Django reads local `.env` values for development; Vercel supplies its environment variables at runtime.
 
-## Configuration and deployment
+After the hosted database is configured, run `python manage.py migrate` once against it to create Django's built-in auth and session tables. Do this before enabling login.
 
-The server binds to `127.0.0.1:8000` by default. Set `UMS_HOST` and `UMS_PORT` to change the listener; set `UMS_DB_PATH` to change the database path. Set `UMS_ALLOW_INITIAL_SETUP=0` after provisioning the first Admin. For HTTPS behind a trusted reverse proxy, set `UMS_COOKIE_SECURE=1`.
-
-This built-in server is intended for local development. Before public deployment, put the app behind a production WSGI server and TLS reverse proxy, disable first-admin setup after provisioning, configure backups, and add an email-based password recovery flow. Never use the sample academic records as real student data.
-
-See [`BACKEND_HANDOFF.md`](BACKEND_HANDOFF.md) for the API and permission model.
+The API, frontend and static assets are served by the same Django origin. API requests use `/api/...`.

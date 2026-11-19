@@ -1,3 +1,10 @@
 __pycache__/
 *.py[cod]
 data/
+.env
+.env.*
+!.env.example
+.vercel/
+venv/
+.venv/
+staticfiles/

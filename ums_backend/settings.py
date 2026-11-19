@@ -10,22 +10,39 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load local-only configuration when developing. Vercel injects its environment
+# variables directly and should never receive a committed .env file.
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+if load_dotenv:
+    load_dotenv(BASE_DIR / '.env')
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-2e2)@nt=f&obax8y1^#yhjr&wthzq+nna##j0foop@s3fk(m#w'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'local-only-insecure-key-change-before-deploy')
+if os.environ.get('VERCEL') and not os.environ.get('DJANGO_SECRET_KEY'):
+    raise RuntimeError('Set DJANGO_SECRET_KEY in the Vercel project environment variables.')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'false' if os.environ.get('VERCEL') else 'true').lower() in ('1', 'true', 'yes')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config(ALLOWED_HOSTS").split(",") 
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
@@ -41,6 +58,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -78,14 +96,19 @@ AUTH_USER_MODEL = 'core.User'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'lotus_university',
-        'USER': 'ums_backend',
-        'PASSWORD': 'Ums@Backend123',
-        'HOST': 'localhost',
-        'PORT': '3306',
+        'NAME': os.environ.get('MYSQL_DATABASE', 'lotus_university'),
+        'USER': os.environ.get('MYSQL_USER', 'ums_backend'),
+        'PASSWORD': os.environ.get('MYSQL_PASSWORD', ''),
+        'HOST': os.environ.get('MYSQL_HOST', 'localhost'),
+        'PORT': os.environ.get('MYSQL_PORT', '3306'),
         'OPTIONS': {'charset': 'utf8mb4'},
     }
 }
+if os.environ.get('VERCEL'):
+    missing_mysql = [name for name in ('MYSQL_DATABASE', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_HOST')
+                     if not os.environ.get(name)]
+    if missing_mysql:
+        raise RuntimeError('Set Vercel database environment variables: ' + ', '.join(missing_mysql))
 
 
 # Password validation
@@ -123,8 +146,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
-
-
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
@@ -133,3 +155,6 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+
+STATICFILES_STORAGE = 'whitenoise.storage.StaticFilesStorage'

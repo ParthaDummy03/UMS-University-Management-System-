@@ -34,7 +34,7 @@ Admin: A001 থেকে A030।
 
 
 Login-এর জন্য:
-সব user-এর password একই: Lotus@123। 
+সব user-এর password একই: [development-only password - rotate before deployment]।
 এটা Django-র নিজস্ব hash format-এ রাখা আছে, 
 তাই backend থেকে সরাসরি login হবে।
 Admin-এর email admin01@lotus.edu থেকে admin30@lotus.edu। admin01 superuser।

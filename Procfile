@@ -1,0 +1,1 @@
+web: gunicorn UMS-University-Management-System-.wsgi
