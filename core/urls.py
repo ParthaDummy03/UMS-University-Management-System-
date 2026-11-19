@@ -7,4 +7,5 @@ urlpatterns = [
     path('auth/logout', views.logout_view),
     path('reports/overview', api.reports_overview),
     path('<str:resource>', api.resource_list),
+    path('<str:resource>/<str:ident>', api.resource_item),
 ]

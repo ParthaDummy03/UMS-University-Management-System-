@@ -1,74 +1,59 @@
-const resourcePath = {
-  schedule: 'schedules',
-  grades: 'results'
-};
+/* API boundary. Talks to the Django backend on the same origin (cookie session + CSRF token). */
+const api = (() => {
+  const BASE = '/api';
 
-async function requestApi(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: 'same-origin',
-    cache: 'no-store',
-    ...options,
-    headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers
-    }
-  });
-  const payload = response.status === 204 ? null : await response.json().catch(() => ({}));
-  if (!response.ok) {
-    if (response.status === 401 && path.startsWith('/api/') && !path.startsWith('/api/auth/')) {
-      window.dispatchEvent(new Event('ums-auth-expired'));
-    }
-    const error = new Error(payload?.error?.message || `Request failed (${response.status}).`);
-    error.status = response.status;
-    error.code = payload?.error?.code;
-    error.fields = payload?.error?.fields || {};
-    throw error;
+  function csrfToken() {
+    const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
   }
-  return payload;
-}
 
-const api = {
-  auth: {
-    async setupStatus() {
-      return requestApi('/api/auth/setup-status');
-    },
-    async setupAdmin(credentials) {
-      return requestApi('/api/auth/setup-admin', { method: 'POST', body: JSON.stringify(credentials) });
-    },
-    async currentUser() {
-      try {
-        const result = await requestApi('/api/auth/me');
-        return result.user;
-      } catch (error) {
-        if (error.status === 401) return null;
-        throw error;
+  async function request(method, path, body) {
+    const options = { method, credentials: 'same-origin', headers: { Accept: 'application/json' } };
+    if (method !== 'GET') {
+      options.headers['Content-Type'] = 'application/json';
+      options.headers['X-CSRFToken'] = csrfToken();
+    }
+    if (body !== undefined) options.body = JSON.stringify(body);
+    let response;
+    try {
+      response = await fetch(BASE + path, options);
+    } catch (networkError) {
+      throw new Error('Cannot reach the server. Check that it is running and try again.');
+    }
+    let data = null;
+    try { data = await response.json(); } catch (parseError) { /* non-JSON response */ }
+    if (!response.ok) {
+      const err = new Error((data && data.error && data.error.message) || 'Request failed (' + response.status + ').');
+      err.status = response.status;
+      err.code = data && data.error && data.error.code;
+      err.fields = (data && data.error && data.error.fields) || {};
+      throw err;
+    }
+    return data;
+  }
+
+  return {
+    auth: {
+      async currentUser() {
+        try { return (await request('GET', '/auth/me')).item; }
+        catch (err) { if (err.status === 401) return null; throw err; }
+      },
+      async login({ identity, password }) {
+        const data = await request('POST', '/auth/login', { identity, password });
+        return { user: data.item };
+      },
+      async logout() {
+        try { await request('POST', '/auth/logout', {}); } catch (err) { /* already signed out */ }
+        return { ok: true };
+      },
+      async forgotPassword() {
+        throw new Error('Online password recovery is not available. Please contact the university administration to reset your password.');
       }
     },
-    async login(credentials) {
-      return requestApi('/api/auth/login', { method: 'POST', body: JSON.stringify(credentials) });
-    },
-    async logout() {
-      return requestApi('/api/auth/logout', { method: 'POST', body: '{}' });
-    }
-  },
-  async bootstrap() {
-    return requestApi('/api/bootstrap');
-  },
-  async list(resource) {
-    const path = resourcePath[resource] || resource;
-    const result = await requestApi(`/api/${path}`);
-    return result.items || [];
-  },
-  async create(resource, record) {
-    const path = resourcePath[resource] || resource;
-    return requestApi(`/api/${path}`, { method: 'POST', body: JSON.stringify(record) });
-  },
-  async update(resource, id, patch) {
-    const path = resourcePath[resource] || resource;
-    return requestApi(`/api/${path}/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) });
-  },
-  async remove(resource, id) {
-    const path = resourcePath[resource] || resource;
-    return requestApi(`/api/${path}/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  }
-};
+    list: (resource, query) => request('GET', '/' + resource + (query ? '?' + query : '')),
+    create: (resource, record) => request('POST', '/' + resource, record),
+    update: (resource, id, patch) => request('PATCH', '/' + resource + '/' + encodeURIComponent(id), patch),
+    remove: (resource, id) => request('DELETE', '/' + resource + '/' + encodeURIComponent(id)),
+    reports: () => request('GET', '/reports/overview')
+  };
+})();

@@ -10,3 +10,4 @@ DATABASES = {
     }
 }
 AUTH_USER_MODEL = 'core.User'
+SESSION_COOKIE_AGE = 60 * 60 * 2

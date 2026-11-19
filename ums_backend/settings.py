@@ -68,6 +68,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'ums_backend.wsgi.application'
 
+# The login accounts are stored in the existing `users` table via core.User.
+AUTH_USER_MODEL = 'core.User'
+
 
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases

@@ -66,7 +66,7 @@ def ser_teacher(f):
 
 def ser_department(d):
     head = d.head_faculty.user.full_name if d.head_faculty else None
-    return {'id': d.code, 'name': d.name, 'head': head,
+    return {'id': d.code, 'code': d.code, 'name': d.name, 'head': head,
             'students': d.student_count, 'teachers': d.teacher_count}
 
 
@@ -253,14 +253,25 @@ RESOURCES = {
 
 
 @api_login
-@require_http_methods(['GET'])
+@require_http_methods(['GET', 'POST'])
 def resource_list(request, resource):
+    if request.method == 'POST':
+        from . import writes
+        return writes.run(request, resource, 'create')
     handler = RESOURCES.get(resource)
     if handler is None:
         return error('not_found', 'Unknown resource.', 404)
     if request.user.role in ('student', 'faculty') and my_profile(request) is None:
         return error('no_profile', 'No profile is linked to this account.', 403)
     return handler(request)
+
+
+@api_login
+@require_http_methods(['PATCH', 'PUT', 'DELETE'])
+def resource_item(request, resource, ident):
+    from . import writes
+    action = 'delete' if request.method == 'DELETE' else 'update'
+    return writes.run(request, resource, action, ident)
 
 
 # ---------- Reports (admin ও teacher) ----------
