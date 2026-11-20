@@ -40,3 +40,5 @@ Login-এর জন্য:
 Admin-এর email admin01@lotus.edu থেকে admin30@lotus.edu। admin01 superuser।
 Student-এর email <student_id>@student.lotus.edu, যেমন 223933212@student.lotus.edu।
 Faculty-র email firstname.lastname@lotus.edu
+
+Default Password:Lotus@123
